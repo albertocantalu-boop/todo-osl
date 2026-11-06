@@ -26,6 +26,7 @@
   .griglia .titolo { display:block; font-weight:bold; line-height:1.3; }
   .griglia .sotto { display:block; font-size:12px; color:var(--grigio); margin-top:2px; }
   .griglia td.data, .griglia td.largo { white-space:nowrap; }
+  .griglia td.ref { font-size:12.5px; min-width:90px; }
   .griglia td.data { font-weight:bold; }
   .griglia td.data.scaduta { color:var(--rosso); background:var(--rosa); }
   .griglia td.data.vicina { color:#b45309; background:#fef3c7; }
@@ -38,6 +39,8 @@
   @media (max-width:700px) {
     main { padding:8px 6px 40px; }
     .griglia .largo { display:none; }
+    .griglia td.ref { font-size:11.5px; min-width:0; max-width:70px; overflow-wrap:break-word; }
+    .griglia .titolo { font-size:12.5px; }
     .griglia th, .griglia td { padding:6px 4px; }
     .griglia { font-size:13px; }
   }
@@ -173,8 +176,8 @@
     l.sort((a, b) => chiave(a) < chiave(b) ? -1 : chiave(a) > chiave(b) ? 1 : a.pri - b.pri || a.n - b.n);
     const sette = new Date(D.oggi); sette.setDate(sette.getDate() + 7); const s7 = sette.toISOString().slice(0, 10);
     $('lista').innerHTML = l.length ? `<table class="griglia"><thead><tr>
-        <th class="c-chk" title="Chiusa">✓</th><th class="num">N°</th><th>Attività</th><th>Scadenza</th><th class="c-pri">Pri.</th>
-        <th class="largo">Referente OSL</th><th class="largo num">Ore</th><th class="c-az"></th></tr></thead><tbody>`
+        <th class="c-chk" title="Chiusa">✓</th><th class="num">N°</th><th>Attività</th><th>Scad<span class="largo">enza</span></th><th class="c-pri">Pri.</th>
+        <th><span class="largo">Referente </span>OSL</th><th><span class="largo">Referente </span>Grafos</th><th class="largo num">Ore</th><th class="largo c-az"></th></tr></thead><tbody>`
       + l.map(a => riga(a, s7)).join('') + '</tbody></table>'
       : '<div class="vuoto">Nessuna attività con questi filtri.</div>';
   }
@@ -185,12 +188,13 @@
       <td class="c-chk"><input type="checkbox" ${a.chiusa ? 'checked' : ''} onchange="spunta(${a.n}, this.checked)" title="Chiusa"></td>
       <td class="num">${a.n}</td>
       <td class="desc" onclick="apriAttivita(${a.n})"><span class="titolo">${esc(a.att)}</span>
-        <span class="sotto">OSL: ${esc(a.osl)} · Grafos: ${esc(a.grafos)}${a.chiusa && a.dchius ? ' · chiusa il ' + gg(a.dchius) : ''}${a.note ? ' · 📝 ' + esc(a.note) : ''}</span></td>
+        ${a.note || (a.chiusa && a.dchius) ? `<span class="sotto">${a.chiusa && a.dchius ? 'chiusa il ' + gg(a.dchius) : ''}${a.chiusa && a.dchius && a.note ? ' · ' : ''}${a.note ? '📝 ' + esc(a.note) : ''}</span>` : ''}</td>
       <td class="data ${cl}">${a.scad ? (a.scad.slice(0, 4) === D.oggi.slice(0, 4) ? gg(a.scad).slice(0, 5) : gg(a.scad)) : '—'}</td>
       <td class="c-pri"><span class="pri p${a.pri}">${a.pri}</span></td>
-      <td class="largo">${esc(a.osl)}</td>
+      <td class="ref">${esc(a.osl)}</td>
+      <td class="ref">${esc(a.grafos)}</td>
       <td class="largo num">${a.ore ? String(a.ore).replace('.', ',') : ''}</td>
-      <td class="c-az"><button onclick="apriOre(${a.n})" title="Scrivi ore">Ore</button></td>
+      <td class="largo c-az"><button onclick="apriOre(${a.n})" title="Scrivi ore">Ore</button></td>
     </tr>`;
   }
 
