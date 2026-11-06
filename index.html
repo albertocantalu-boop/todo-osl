@@ -31,7 +31,12 @@
   .griglia td.data.scaduta { color:var(--rosso); background:var(--rosa); }
   .griglia td.data.vicina { color:#b45309; background:#fef3c7; }
   .griglia .c-chk, .griglia .c-pri { text-align:center; }
-  .griglia .c-chk input { width:20px; height:20px; margin:0; }
+  .griglia tbody tr { cursor:pointer; }
+  .griglia .fatta { color:#15803d; font-weight:bold; font-size:16px; }
+  button.rosso { background:var(--rosso); border-color:var(--rosso); color:#fff; }
+  .lavoro { border-top:2px solid var(--bordo); margin-top:16px; padding-top:10px; }
+  .lavoro h4 { margin:0 0 4px; color:var(--blu); font-size:14px; }
+  .aiuto { font-size:12px; color:var(--grigio); margin:6px 0 0; }
   .griglia .c-az button { padding:3px 8px; font-size:12px; }
   .griglia tr.chiusa td { opacity:.55; } .griglia tr.chiusa .titolo { text-decoration:line-through; }
   .pri { display:inline-block; min-width:22px; text-align:center; border-radius:10px; padding:1px 7px; font-size:12px; font-weight:bold; background:#e8ecf3; color:var(--blu); }
@@ -92,6 +97,18 @@
   <label>Riferimento (task, mail)</label><input id="aRif">
   <label>Note</label><textarea id="aNote"></textarea>
   <div class="fondo"><button onclick="chiudiModale('mAtt')">Annulla</button><button class="pieno" onclick="salvaAtt()">Salva</button></div>
+  <div id="aLavoro" class="lavoro">
+    <h4>Ore e chiusura</h4>
+    <div id="aStorico"></div>
+    <div class="riga">
+      <div><label>Giorno</label><input type="date" id="lData"></div>
+      <div><label>Ore</label><input id="lOre" inputmode="decimal" placeholder="es. 2,5"></div>
+    </div>
+    <label>Note (vanno nel resoconto per il rapportino)</label><textarea id="lNote"></textarea>
+    <p class="aiuto">Per chiudere l’attività servono le ore (anche 0) e una nota su cosa è stato fatto.</p>
+    <div class="fondo"><button onclick="scriviOre(false)">Scrivi ore</button><button class="rosso" onclick="scriviOre(true)">Scrivi ore e chiudi l’attività</button></div>
+  </div>
+  <div id="aRiapri" class="lavoro"><span id="aChiusaIl"></span> <button onclick="riapri()">Riapri</button></div>
 </div></div>
 
 <div class="modale" id="mOre"><div class="box">
@@ -176,25 +193,25 @@
     l.sort((a, b) => chiave(a) < chiave(b) ? -1 : chiave(a) > chiave(b) ? 1 : a.pri - b.pri || a.n - b.n);
     const sette = new Date(D.oggi); sette.setDate(sette.getDate() + 7); const s7 = sette.toISOString().slice(0, 10);
     $('lista').innerHTML = l.length ? `<table class="griglia"><thead><tr>
-        <th class="c-chk" title="Chiusa">✓</th><th class="num">N°</th><th>Attività</th><th>Scad<span class="largo">enza</span></th><th class="c-pri">Pri.</th>
-        <th><span class="largo">Referente </span>OSL</th><th><span class="largo">Referente </span>Grafos</th><th class="largo num">Ore</th><th class="largo c-az"></th></tr></thead><tbody>`
+        <th class="c-chk" title="Chiusa"></th><th class="num">N°</th><th>Attività</th><th>Scad<span class="largo">enza</span></th><th class="c-pri">Pri.</th>
+        <th><span class="largo">Referente </span>OSL</th><th><span class="largo">Referente </span>Grafos</th><th class="largo num">Ore</th></tr></thead><tbody>`
       + l.map(a => riga(a, s7)).join('') + '</tbody></table>'
       : '<div class="vuoto">Nessuna attività con questi filtri.</div>';
   }
 
   function riga(a, s7) {
     const cl = a.chiusa ? '' : !a.scad ? '' : a.scad < D.oggi ? 'scaduta' : a.scad <= s7 ? 'vicina' : '';
-    return `<tr class="${a.chiusa ? 'chiusa' : ''}">
-      <td class="c-chk"><input type="checkbox" ${a.chiusa ? 'checked' : ''} onchange="spunta(${a.n}, this.checked)" title="Chiusa"></td>
+    // Tutta la riga apre la scheda: la chiusura sta solo li', insieme a ore e note (Alberto Cantalu, 06/11).
+    return `<tr class="${a.chiusa ? 'chiusa' : ''}" onclick="apriAttivita(${a.n})">
+      <td class="c-chk">${a.chiusa ? '<span class="fatta" title="Chiusa">✓</span>' : ''}</td>
       <td class="num">${a.n}</td>
-      <td class="desc" onclick="apriAttivita(${a.n})"><span class="titolo">${esc(a.att)}</span>
+      <td class="desc"><span class="titolo">${esc(a.att)}</span>
         ${a.note || (a.chiusa && a.dchius) ? `<span class="sotto">${a.chiusa && a.dchius ? 'chiusa il ' + gg(a.dchius) : ''}${a.chiusa && a.dchius && a.note ? ' · ' : ''}${a.note ? '📝 ' + esc(a.note) : ''}</span>` : ''}</td>
       <td class="data ${cl}">${a.scad ? (a.scad.slice(0, 4) === D.oggi.slice(0, 4) ? gg(a.scad).slice(0, 5) : gg(a.scad)) : '—'}</td>
       <td class="c-pri"><span class="pri p${a.pri}">${a.pri}</span></td>
       <td class="ref">${esc(a.osl)}</td>
       <td class="ref">${esc(a.grafos)}</td>
       <td class="largo num">${a.ore ? String(a.ore).replace('.', ',') : ''}</td>
-      <td class="largo c-az"><button onclick="apriOre(${a.n})" title="Scrivi ore">Ore</button></td>
     </tr>`;
   }
 
@@ -206,7 +223,35 @@
     $('mAttTitolo').textContent = n ? `Attività ${n}` : 'Nuova attività';
     $('aN').value = n || ''; $('aAtt').value = a.att; $('aOsl').value = a.osl; $('aGrafos').value = a.grafos;
     $('aPri').value = a.pri; $('aScad').value = a.scad; $('aRif').value = a.rif; $('aNote').value = a.note;
+    $('aLavoro').style.display = n && !a.chiusa ? 'block' : 'none';
+    $('aRiapri').style.display = n && a.chiusa ? 'block' : 'none';
+    if (n) {
+      $('lData').value = D.oggi; $('lOre').value = ''; $('lNote').value = '';
+      const l = D.ore.filter(o => o.n === n).sort((x, y) => x.data < y.data ? 1 : -1);
+      const tot = l.reduce((s, o) => s + o.ore, 0);
+      $('aStorico').innerHTML = l.length ? `<label>Ore già scritte: ${String(tot).replace('.', ',')} h</label><table class="oreoggi">`
+        + l.map(o => `<tr><td>${gg(o.data)}</td><td class="num">${String(o.ore).replace('.', ',')} h</td><td>${esc(o.note)}</td></tr>`).join('') + '</table>' : '';
+      $('aChiusaIl').textContent = a.chiusa ? 'Chiusa' + (a.dchius ? ' il ' + gg(a.dchius) : '') + '.' : '';
+    }
     apri('mAtt');
+  }
+  // Ore, note e chiusura stanno insieme: non si chiude senza dire quante ore e che cosa e' stato fatto.
+  function scriviOre(chiudi) {
+    const n = Number($('aN').value);
+    const x = { data: $('lData').value, n, ore: $('lOre').value.trim(), note: $('lNote').value.trim() };
+    const ore = parseFloat(x.ore.replace(',', '.'));
+    if (!x.data) { avviso('Scegli il giorno.'); return; }
+    if (chiudi && (x.ore === '' || !(ore >= 0) || !x.note)) { avviso('Per chiudere servono le ore (anche 0) e la nota.'); return; }
+    if (!chiudi && !(ore > 0)) { avviso('Scrivi le ore.'); return; }
+    chiama('aggiungiOre', x)
+      .then(d => chiudi ? chiama('chiudiAttivita', n, true) : d)
+      .then(d => { carica(d); chiudiModale('mAtt'); avviso(chiudi ? `Attività ${n} chiusa.` : 'Ore scritte.'); })
+      .catch(errore);
+  }
+  function riapri() {
+    const n = Number($('aN').value);
+    if (!confirm(`Riaprire l’attività ${n}?`)) return;
+    chiama('chiudiAttivita', n, false).then(d => { carica(d); chiudiModale('mAtt'); avviso(`Attività ${n} riaperta.`); }).catch(errore);
   }
   function salvaAtt() {
     const x = { n: $('aN').value, att: $('aAtt').value.trim(), osl: $('aOsl').value.trim(), grafos: $('aGrafos').value.trim(),
@@ -214,7 +259,6 @@
     if (!x.att) { avviso('Scrivi l’attività.'); return; }
     chiama('salvaAttivita', x).then(d => { carica(d); chiudiModale('mAtt'); avviso('Salvata.'); }).catch(errore);
   }
-  function spunta(n, v) { chiama('chiudiAttivita', n, v).then(d => { carica(d); avviso(v ? 'Chiusa.' : 'Riaperta.'); }).catch(errore); }
 
   function apriOre(n) {
     $('oData').value = D.oggi; $('oOre').value = ''; $('oNote').value = '';
