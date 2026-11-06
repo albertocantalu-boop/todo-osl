@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>To-do OSL – Grafos</title>
+<style>
+  :root { --blu:#1f3864; --rosso:#c00000; --rosa:#fde2e1; --grigio:#6b7280; --bordo:#d9dde3; --sfondo:#f4f6f9; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#1d2433; background:var(--sfondo); }
+  header { background:var(--blu); color:#fff; padding:12px 16px; position:sticky; top:0; z-index:5; }
+  header h1 { margin:0; font-size:18px; }
+  header .sub { font-size:12px; opacity:.85; margin-top:2px; }
+  .barra { display:flex; flex-wrap:wrap; gap:8px; padding:10px 16px; background:#fff; border-bottom:1px solid var(--bordo); }
+  .barra select, .barra input { padding:6px 8px; border:1px solid var(--bordo); border-radius:6px; font-size:13px; }
+  button { padding:7px 12px; border-radius:6px; border:1px solid var(--blu); background:#fff; color:var(--blu); font-weight:bold; cursor:pointer; font-size:13px; }
+  button.pieno { background:var(--blu); color:#fff; }
+  main { padding:12px 16px 40px; max-width:1100px; margin:0 auto; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--grigio); margin:18px 0 8px; }
+  h2.scadute { color:var(--rosso); }
+  .card { background:#fff; border:1px solid var(--bordo); border-radius:8px; padding:10px 12px; margin-bottom:8px; display:grid;
+          grid-template-columns:28px 1fr auto; gap:6px 10px; align-items:start; }
+  .card.chiusa { opacity:.55; }
+  .card.chiusa .titolo { text-decoration:line-through; }
+  .card input[type=checkbox] { width:20px; height:20px; margin-top:2px; }
+  .titolo { font-weight:bold; line-height:1.3; }
+  .meta { font-size:12px; color:var(--grigio); margin-top:4px; display:flex; flex-wrap:wrap; gap:4px 12px; }
+  .pri { display:inline-block; min-width:22px; text-align:center; border-radius:10px; padding:1px 7px; font-size:12px; font-weight:bold; background:#e8ecf3; color:var(--blu); }
+  .pri.p1 { background:var(--rosso); color:#fff; }
+  .scad { font-weight:bold; }
+  .scad.passata { color:var(--rosso); background:var(--rosa); padding:0 4px; border-radius:4px; }
+  .azioni { display:flex; gap:6px; }
+  .card > div { min-width:0; }
+  .titolo, .meta { overflow-wrap:anywhere; }
+  @media (max-width:600px) { .card { grid-template-columns:28px 1fr; } .azioni { grid-column:2; } }
+  .azioni button { padding:4px 8px; font-size:12px; }
+  .vuoto { color:var(--grigio); font-style:italic; padding:6px 0; }
+  .modale { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:flex-start; justify-content:center; z-index:20; overflow-y:auto; }
+  .modale.aperta { display:flex; }
+  .box { background:#fff; border-radius:10px; padding:16px; margin:40px 12px; width:100%; max-width:560px; }
+  .box h3 { margin:0 0 12px; color:var(--blu); }
+  .box label { display:block; font-size:12px; color:var(--grigio); margin:10px 0 3px; }
+  .box input, .box textarea, .box select { width:100%; padding:7px 8px; border:1px solid var(--bordo); border-radius:6px; font-size:14px; font-family:inherit; }
+  .box textarea { min-height:70px; }
+  .box .riga { display:flex; gap:10px; } .box .riga > div { flex:1; }
+  .box .fondo { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+  #avviso { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#1d2433; color:#fff; padding:9px 14px; border-radius:8px; font-size:13px; display:none; z-index:30; max-width:90%; }
+  table.oreoggi { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+  table.oreoggi td, table.oreoggi th { border:1px solid var(--bordo); padding:5px 8px; text-align:left; vertical-align:top; }
+  table.oreoggi td.num { text-align:right; white-space:nowrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>To-do OSL – Grafos</h1>
+  <div class="sub" id="sottotitolo">caricamento…</div>
+</header>
+<div class="barra">
+  <button class="pieno" onclick="apriAttivita()">+ Attività</button>
+  <button class="pieno" onclick="apriOre()">+ Ore</button>
+  <button onclick="apriResoconto()">Resoconto</button>
+  <button onclick="apriGiornata()">Fissa giornata</button>
+  <select id="fPri" onchange="disegna()"><option value="">Tutte le priorità</option><option>1</option><option>2</option><option>3</option></select>
+  <select id="fOsl" onchange="disegna()"><option value="">Tutti i referenti OSL</option></select>
+  <select id="fStato" onchange="disegna()"><option value="aperte">Aperte</option><option value="tutte">Aperte e chiuse</option><option value="chiuse">Chiuse</option></select>
+  <input id="fTesto" placeholder="Cerca…" oninput="disegna()">
+</div>
+<main id="lista"></main>
+
+<div class="modale" id="mAtt"><div class="box">
+  <h3 id="mAttTitolo">Attività</h3>
+  <input type="hidden" id="aN">
+  <label>Attività</label><textarea id="aAtt"></textarea>
+  <div class="riga">
+    <div><label>Referente OSL</label><input id="aOsl" list="elencoOsl"></div>
+    <div><label>Referente Grafos</label><input id="aGrafos" list="elencoGrafos"></div>
+  </div>
+  <div class="riga">
+    <div><label>Priorità</label><select id="aPri"><option>1</option><option selected>2</option><option>3</option></select></div>
+    <div><label>Scadenza</label><input type="date" id="aScad"></div>
+  </div>
+  <label>Riferimento (task, mail)</label><input id="aRif">
+  <label>Note</label><textarea id="aNote"></textarea>
+  <div class="fondo"><button onclick="chiudiModale('mAtt')">Annulla</button><button class="pieno" onclick="salvaAtt()">Salva</button></div>
+</div></div>
+
+<div class="modale" id="mOre"><div class="box">
+  <h3>Ore della giornata</h3>
+  <div class="riga">
+    <div><label>Giorno</label><input type="date" id="oData"></div>
+    <div><label>Ore</label><input id="oOre" inputmode="decimal" placeholder="es. 2,5"></div>
+  </div>
+  <label>Attività</label><select id="oN"></select>
+  <label>Note (vanno nel resoconto per il rapportino)</label><textarea id="oNote"></textarea>
+  <div id="oOggi"></div>
+  <div class="fondo"><button onclick="chiudiModale('mOre')">Chiudi</button><button class="pieno" onclick="salvaOre()">Aggiungi</button></div>
+</div></div>
+
+<div class="modale" id="mRes"><div class="box">
+  <h3>Resoconto per il rapportino</h3>
+  <label>Giorno</label><input type="date" id="rData">
+  <p style="font-size:13px;color:#6b7280">Manda a Marco (con Alberto in copia) le ore e le attività chiuse di quel giorno. Ogni sera alle 19 parte comunque da solo.</p>
+  <div class="fondo"><button onclick="chiudiModale('mRes')">Annulla</button><button class="pieno" onclick="mandaRes()">Manda</button></div>
+</div></div>
+
+<div class="modale" id="mGio"><div class="box">
+  <h3>Fissa una giornata con Marco</h3>
+  <label>Giorno</label><input type="date" id="gData">
+  <p style="font-size:13px;color:#6b7280">Manda a Marco un invito dalle 8 alle 18 in Grafos, con il link a questa to-do. Serve a bloccare le agende: la lista delle cose da fare resta qui.</p>
+  <div class="fondo"><button onclick="chiudiModale('mGio')">Annulla</button><button class="pieno" onclick="mandaGio()">Manda l'invito</button></div>
+</div></div>
+
+<datalist id="elencoOsl"></datalist><datalist id="elencoGrafos"></datalist>
+<div id="avviso"></div>
+
+<script>
+  let D = null;
+  const $ = id => document.getElementById(id);
+  const gg = s => s ? s.split('-').reverse().join('/') : '';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function avviso(t) { const a = $('avviso'); a.textContent = t; a.style.display = 'block'; clearTimeout(avviso.t); avviso.t = setTimeout(() => a.style.display = 'none', 3500); }
+  function errore(e) { avviso('Errore: ' + (e && e.message ? e.message : e)); }
+  function carica(d) { D = d; riempiElenchi(); disegna(); }
+  // La pagina sta su GitHub Pages e non contiene dati: il link porta nel # l'id dello script (u) e la chiave (k),
+  // che restano nel telefono (il # non arriva a nessun server). Si chiama lo script senza cookie: cosi' non
+  // interviene l'account Google del browser, che con piu' account collegati rompeva la pagina di Google (06/11).
+  const P = (() => {
+    const h = new URLSearchParams(location.hash.slice(1));
+    let u = h.get('u'), k = h.get('k');
+    try {
+      if (u && k) localStorage.setItem('todoosl', JSON.stringify({ u, k }));
+      else ({ u, k } = JSON.parse(localStorage.getItem('todoosl') || '{}'));
+    } catch (e) {}
+    return { u, k };
+  })();
+  function chiama(fn, ...args) {
+    if (!P.u || !P.k) return Promise.reject(new Error('link incompleto, apri quello ricevuto per mail.'));
+    return fetch('https://script.google.com/macros/s/' + P.u + '/exec',
+      { method: 'POST', body: JSON.stringify({ k: P.k, fn, args }), credentials: 'omit', redirect: 'follow' })
+      .then(r => r.json()).then(d => { if (d.errore) throw new Error(d.errore); return d.ok; });
+  }
+
+  function riempiElenchi() {
+    const osl = [...new Set(D.attivita.map(a => a.osl).filter(Boolean))].sort();
+    const gr = [...new Set(D.attivita.map(a => a.grafos).filter(Boolean))].sort();
+    const f = $('fOsl'), v = f.value;
+    f.innerHTML = '<option value="">Tutti i referenti OSL</option>' + osl.map(o => `<option>${esc(o)}</option>`).join('');
+    f.value = v;
+    $('elencoOsl').innerHTML = osl.map(o => `<option value="${esc(o)}">`).join('');
+    $('elencoGrafos').innerHTML = gr.map(o => `<option value="${esc(o)}">`).join('');
+    const aperte = D.attivita.filter(a => !a.chiusa).sort((a, b) => a.n - b.n);
+    $('oN').innerHTML = aperte.map(a => `<option value="${a.n}">${a.n}. ${esc(a.att.slice(0, 90))}</option>`).join('');
+    const ap = aperte.length, sc = aperte.filter(a => a.scad && a.scad < D.oggi).length;
+    $('sottotitolo').textContent = `${ap} attività aperte · ${sc} scadute · aggiornato ${gg(D.oggi)}`;
+  }
+
+  function disegna() {
+    if (!D) return;
+    const p = $('fPri').value, o = $('fOsl').value, st = $('fStato').value, t = $('fTesto').value.toLowerCase();
+    let l = D.attivita.filter(a => (!p || String(a.pri) === p) && (!o || a.osl === o)
+      && (st === 'tutte' || (st === 'aperte' ? !a.chiusa : a.chiusa))
+      && (!t || (a.att + ' ' + a.osl + ' ' + a.grafos + ' ' + a.rif + ' ' + a.note).toLowerCase().includes(t)));
+    l.sort((a, b) => (a.scad || '9999') < (b.scad || '9999') ? -1 : (a.scad || '9999') > (b.scad || '9999') ? 1 : a.pri - b.pri || a.n - b.n);
+    const sette = new Date(D.oggi); sette.setDate(sette.getDate() + 7); const s7 = sette.toISOString().slice(0, 10);
+    const gruppi = [
+      ['Scadute', a => !a.chiusa && a.scad && a.scad < D.oggi, 'scadute'],
+      ['Entro 7 giorni', a => !a.chiusa && a.scad && a.scad >= D.oggi && a.scad <= s7, ''],
+      ['Più avanti', a => !a.chiusa && a.scad && a.scad > s7, ''],
+      ['Senza scadenza', a => !a.chiusa && !a.scad, ''],
+      ['Chiuse', a => a.chiusa, '']];
+    let h = '';
+    gruppi.forEach(([tit, f, cl]) => {
+      const g = l.filter(f);
+      if (!g.length) return;
+      h += `<h2 class="${cl}">${tit} (${g.length})</h2>` + g.map(card).join('');
+    });
+    $('lista').innerHTML = h || '<div class="vuoto">Nessuna attività con questi filtri.</div>';
+  }
+
+  function card(a) {
+    const passata = !a.chiusa && a.scad && a.scad < D.oggi;
+    return `<div class="card ${a.chiusa ? 'chiusa' : ''}">
+      <input type="checkbox" ${a.chiusa ? 'checked' : ''} onchange="spunta(${a.n}, this.checked)" title="Chiusa">
+      <div><div class="titolo">${a.n}. ${esc(a.att)}</div>
+        <div class="meta"><span class="pri p${a.pri}">${a.pri}</span>
+          ${a.scad ? `<span class="scad ${passata ? 'passata' : ''}">entro ${gg(a.scad)}</span>` : ''}
+          <span>OSL: <b>${esc(a.osl)}</b></span><span>Grafos: ${esc(a.grafos)}</span>
+          ${a.ore ? `<span>${String(a.ore).replace('.', ',')} ore</span>` : ''}
+          ${a.chiusa && a.dchius ? `<span>chiusa il ${gg(a.dchius)}</span>` : ''}
+          ${a.rif ? `<span>${esc(a.rif)}</span>` : ''}</div>
+        ${a.note ? `<div class="meta">📝 ${esc(a.note)}</div>` : ''}</div>
+      <div class="azioni"><button onclick="apriOre(${a.n})">Ore</button><button onclick="apriAttivita(${a.n})">Modifica</button></div>
+    </div>`;
+  }
+
+  function apri(id) { $(id).classList.add('aperta'); }
+  function chiudiModale(id) { $(id).classList.remove('aperta'); }
+
+  function apriAttivita(n) {
+    const a = n ? D.attivita.find(x => x.n === n) : { att: '', osl: 'Marco Malavolti', grafos: 'Alberto Cantalù', pri: 2, scad: '', rif: '', note: '' };
+    $('mAttTitolo').textContent = n ? `Attività ${n}` : 'Nuova attività';
+    $('aN').value = n || ''; $('aAtt').value = a.att; $('aOsl').value = a.osl; $('aGrafos').value = a.grafos;
+    $('aPri').value = a.pri; $('aScad').value = a.scad; $('aRif').value = a.rif; $('aNote').value = a.note;
+    apri('mAtt');
+  }
+  function salvaAtt() {
+    const x = { n: $('aN').value, att: $('aAtt').value.trim(), osl: $('aOsl').value.trim(), grafos: $('aGrafos').value.trim(),
+                pri: $('aPri').value, scad: $('aScad').value, rif: $('aRif').value.trim(), note: $('aNote').value.trim() };
+    if (!x.att) { avviso('Scrivi l’attività.'); return; }
+    chiama('salvaAttivita', x).then(d => { carica(d); chiudiModale('mAtt'); avviso('Salvata.'); }).catch(errore);
+  }
+  function spunta(n, v) { chiama('chiudiAttivita', n, v).then(d => { carica(d); avviso(v ? 'Chiusa.' : 'Riaperta.'); }).catch(errore); }
+
+  function apriOre(n) {
+    $('oData').value = D.oggi; $('oOre').value = ''; $('oNote').value = '';
+    if (n) $('oN').value = n;
+    oreDelGiorno(); apri('mOre');
+  }
+  function oreDelGiorno() {
+    const g = $('oData').value, l = D.ore.filter(o => o.data === g);
+    $('oOggi').innerHTML = l.length ? `<label>Già scritte il ${gg(g)}</label><table class="oreoggi">` + l.map(o =>
+      `<tr><td>${o.n}. ${esc(o.att)}</td><td class="num">${String(o.ore).replace('.', ',')} h</td><td>${esc(o.note)}</td></tr>`).join('') + '</table>' : '';
+  }
+  $('oData').addEventListener('change', oreDelGiorno);
+  function salvaOre() {
+    const x = { data: $('oData').value, n: $('oN').value, ore: $('oOre').value.trim(), note: $('oNote').value.trim() };
+    if (!x.data || !x.n || !(parseFloat(x.ore.replace(',', '.')) > 0)) { avviso('Servono giorno, attività e ore.'); return; }
+    chiama('aggiungiOre', x).then(d => { carica(d); $('oOre').value = ''; $('oNote').value = ''; oreDelGiorno(); avviso('Ore aggiunte.'); }).catch(errore);
+  }
+
+  function apriResoconto() { $('rData').value = D.oggi; apri('mRes'); }
+  function mandaRes() { chiama('resocontoDaApp', $('rData').value).then(t => { chiudiModale('mRes'); avviso(t); }).catch(errore); }
+  function apriGiornata() { $('gData').value = ''; apri('mGio'); }
+  function mandaGio() {
+    if (!$('gData').value) { avviso('Scegli il giorno.'); return; }
+    chiama('fissaGiornata', $('gData').value).then(t => { chiudiModale('mGio'); avviso(t); }).catch(errore);
+  }
+
+  chiama('datiApp').then(carica).catch(errore);
+</script>
+</body>
+</html>
