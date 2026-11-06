@@ -17,24 +17,30 @@
   button { padding:7px 12px; border-radius:6px; border:1px solid var(--blu); background:#fff; color:var(--blu); font-weight:bold; cursor:pointer; font-size:13px; }
   button.pieno { background:var(--blu); color:#fff; }
   main { padding:12px 16px 40px; max-width:1100px; margin:0 auto; }
-  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--grigio); margin:18px 0 8px; }
-  h2.scadute { color:var(--rosso); }
-  .card { background:#fff; border:1px solid var(--bordo); border-radius:8px; padding:10px 12px; margin-bottom:8px; display:grid;
-          grid-template-columns:28px 1fr auto; gap:6px 10px; align-items:start; }
-  .card.chiusa { opacity:.55; }
-  .card.chiusa .titolo { text-decoration:line-through; }
-  .card input[type=checkbox] { width:20px; height:20px; margin-top:2px; }
-  .titolo { font-weight:bold; line-height:1.3; }
-  .meta { font-size:12px; color:var(--grigio); margin-top:4px; display:flex; flex-wrap:wrap; gap:4px 12px; }
+  table.griglia { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--bordo); font-size:13.5px; }
+  .griglia th { background:#e8ecf3; color:var(--blu); text-align:left; font-size:12px; padding:7px 8px; border-bottom:1px solid var(--bordo); white-space:nowrap; }
+  .griglia td { padding:7px 8px; border-bottom:1px solid var(--bordo); vertical-align:top; }
+  .griglia tr:hover td { background:#f8fafc; }
+  .griglia .num { text-align:right; white-space:nowrap; }
+  .griglia td.desc { width:100%; overflow-wrap:anywhere; cursor:pointer; }
+  .griglia .titolo { display:block; font-weight:bold; line-height:1.3; }
+  .griglia .sotto { display:block; font-size:12px; color:var(--grigio); margin-top:2px; }
+  .griglia td.data, .griglia td.largo { white-space:nowrap; }
+  .griglia td.data { font-weight:bold; }
+  .griglia td.data.scaduta { color:var(--rosso); background:var(--rosa); }
+  .griglia td.data.vicina { color:#b45309; background:#fef3c7; }
+  .griglia .c-chk, .griglia .c-pri { text-align:center; }
+  .griglia .c-chk input { width:20px; height:20px; margin:0; }
+  .griglia .c-az button { padding:3px 8px; font-size:12px; }
+  .griglia tr.chiusa td { opacity:.55; } .griglia tr.chiusa .titolo { text-decoration:line-through; }
   .pri { display:inline-block; min-width:22px; text-align:center; border-radius:10px; padding:1px 7px; font-size:12px; font-weight:bold; background:#e8ecf3; color:var(--blu); }
   .pri.p1 { background:var(--rosso); color:#fff; }
-  .scad { font-weight:bold; }
-  .scad.passata { color:var(--rosso); background:var(--rosa); padding:0 4px; border-radius:4px; }
-  .azioni { display:flex; gap:6px; }
-  .card > div { min-width:0; }
-  .titolo, .meta { overflow-wrap:anywhere; }
-  @media (max-width:600px) { .card { grid-template-columns:28px 1fr; } .azioni { grid-column:2; } }
-  .azioni button { padding:4px 8px; font-size:12px; }
+  @media (max-width:700px) {
+    main { padding:8px 6px 40px; }
+    .griglia .largo { display:none; }
+    .griglia th, .griglia td { padding:6px 4px; }
+    .griglia { font-size:13px; }
+  }
   .vuoto { color:var(--grigio); font-style:italic; padding:6px 0; }
   .modale { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:flex-start; justify-content:center; z-index:20; overflow-y:auto; }
   .modale.aperta { display:flex; }
@@ -155,43 +161,37 @@
     $('sottotitolo').textContent = `${ap} attività aperte · ${sc} scadute · aggiornato ${gg(D.oggi)}`;
   }
 
+  // Griglia sempre ordinata per scadenza, dalla piu' urgente (Alberto Cantalu, 06/11): a parita' di data
+  // prima la priorita' 1, poi il numero. Le senza scadenza in fondo alle aperte, le chiuse in coda.
   function disegna() {
     if (!D) return;
     const p = $('fPri').value, o = $('fOsl').value, st = $('fStato').value, t = $('fTesto').value.toLowerCase();
-    let l = D.attivita.filter(a => (!p || String(a.pri) === p) && (!o || a.osl === o)
+    const l = D.attivita.filter(a => (!p || String(a.pri) === p) && (!o || a.osl === o)
       && (st === 'tutte' || (st === 'aperte' ? !a.chiusa : a.chiusa))
       && (!t || (a.att + ' ' + a.osl + ' ' + a.grafos + ' ' + a.rif + ' ' + a.note).toLowerCase().includes(t)));
-    l.sort((a, b) => (a.scad || '9999') < (b.scad || '9999') ? -1 : (a.scad || '9999') > (b.scad || '9999') ? 1 : a.pri - b.pri || a.n - b.n);
+    const chiave = a => (a.chiusa ? '1' : '0') + (a.scad || '9999-99-99');
+    l.sort((a, b) => chiave(a) < chiave(b) ? -1 : chiave(a) > chiave(b) ? 1 : a.pri - b.pri || a.n - b.n);
     const sette = new Date(D.oggi); sette.setDate(sette.getDate() + 7); const s7 = sette.toISOString().slice(0, 10);
-    const gruppi = [
-      ['Scadute', a => !a.chiusa && a.scad && a.scad < D.oggi, 'scadute'],
-      ['Entro 7 giorni', a => !a.chiusa && a.scad && a.scad >= D.oggi && a.scad <= s7, ''],
-      ['Più avanti', a => !a.chiusa && a.scad && a.scad > s7, ''],
-      ['Senza scadenza', a => !a.chiusa && !a.scad, ''],
-      ['Chiuse', a => a.chiusa, '']];
-    let h = '';
-    gruppi.forEach(([tit, f, cl]) => {
-      const g = l.filter(f);
-      if (!g.length) return;
-      h += `<h2 class="${cl}">${tit} (${g.length})</h2>` + g.map(card).join('');
-    });
-    $('lista').innerHTML = h || '<div class="vuoto">Nessuna attività con questi filtri.</div>';
+    $('lista').innerHTML = l.length ? `<table class="griglia"><thead><tr>
+        <th class="c-chk" title="Chiusa">✓</th><th class="num">N°</th><th>Attività</th><th>Scadenza</th><th class="c-pri">Pri.</th>
+        <th class="largo">Referente OSL</th><th class="largo num">Ore</th><th class="c-az"></th></tr></thead><tbody>`
+      + l.map(a => riga(a, s7)).join('') + '</tbody></table>'
+      : '<div class="vuoto">Nessuna attività con questi filtri.</div>';
   }
 
-  function card(a) {
-    const passata = !a.chiusa && a.scad && a.scad < D.oggi;
-    return `<div class="card ${a.chiusa ? 'chiusa' : ''}">
-      <input type="checkbox" ${a.chiusa ? 'checked' : ''} onchange="spunta(${a.n}, this.checked)" title="Chiusa">
-      <div><div class="titolo">${a.n}. ${esc(a.att)}</div>
-        <div class="meta"><span class="pri p${a.pri}">${a.pri}</span>
-          ${a.scad ? `<span class="scad ${passata ? 'passata' : ''}">entro ${gg(a.scad)}</span>` : ''}
-          <span>OSL: <b>${esc(a.osl)}</b></span><span>Grafos: ${esc(a.grafos)}</span>
-          ${a.ore ? `<span>${String(a.ore).replace('.', ',')} ore</span>` : ''}
-          ${a.chiusa && a.dchius ? `<span>chiusa il ${gg(a.dchius)}</span>` : ''}
-          ${a.rif ? `<span>${esc(a.rif)}</span>` : ''}</div>
-        ${a.note ? `<div class="meta">📝 ${esc(a.note)}</div>` : ''}</div>
-      <div class="azioni"><button onclick="apriOre(${a.n})">Ore</button><button onclick="apriAttivita(${a.n})">Modifica</button></div>
-    </div>`;
+  function riga(a, s7) {
+    const cl = a.chiusa ? '' : !a.scad ? '' : a.scad < D.oggi ? 'scaduta' : a.scad <= s7 ? 'vicina' : '';
+    return `<tr class="${a.chiusa ? 'chiusa' : ''}">
+      <td class="c-chk"><input type="checkbox" ${a.chiusa ? 'checked' : ''} onchange="spunta(${a.n}, this.checked)" title="Chiusa"></td>
+      <td class="num">${a.n}</td>
+      <td class="desc" onclick="apriAttivita(${a.n})"><span class="titolo">${esc(a.att)}</span>
+        <span class="sotto">OSL: ${esc(a.osl)} · Grafos: ${esc(a.grafos)}${a.chiusa && a.dchius ? ' · chiusa il ' + gg(a.dchius) : ''}${a.note ? ' · 📝 ' + esc(a.note) : ''}</span></td>
+      <td class="data ${cl}">${a.scad ? (a.scad.slice(0, 4) === D.oggi.slice(0, 4) ? gg(a.scad).slice(0, 5) : gg(a.scad)) : '—'}</td>
+      <td class="c-pri"><span class="pri p${a.pri}">${a.pri}</span></td>
+      <td class="largo">${esc(a.osl)}</td>
+      <td class="largo num">${a.ore ? String(a.ore).replace('.', ',') : ''}</td>
+      <td class="c-az"><button onclick="apriOre(${a.n})" title="Scrivi ore">Ore</button></td>
+    </tr>`;
   }
 
   function apri(id) { $(id).classList.add('aperta'); }
